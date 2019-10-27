@@ -48,8 +48,7 @@ final class Parameter: Item, Hashable {
         let functionName = function?.fullName ?? "func()"
         let locationSha = location.description.sha1().prefix(10)
         let usr = "\(locationSha)-\(functionName)-\(name)"
-        let decl = Declaration(kind: .varParameter, usr: usr, location: location)
-        decl.name = name
+        let decl = Declaration(kind: .varParameter, usr: usr, location: location, name: name)
         return decl
     }
 
@@ -102,31 +101,19 @@ final class GenericItem: Item {
 
 final class UnusedParamParser {
     private let file: Path
+    private let sourceFileSyntax: SourceFileSyntax
     private let parseProtocols: Bool
 
-    init(file: Path, parseProtocols: Bool) {
+    init(file: Path, sourceFileSyntax: SourceFileSyntax, parseProtocols: Bool) {
         self.file = file
+        self.sourceFileSyntax = sourceFileSyntax
         self.parseProtocols = parseProtocols
     }
 
-    func parse() throws -> [Function] {
-        let sourceKit = SourceKit(arguments: [])
-        let syntaxTreeResponse = try sourceKit.syntaxTree(file: file)
-        let key = SourceKit.Key.serializedSyntaxTree.rawValue
-
-        guard let syntaxTreeJson = syntaxTreeResponse[key] as? String
-            else { return [] }
-
-        return try parse(syntaxTreeJson: syntaxTreeJson)
-    }
-
-    func parse(syntaxTreeJson: String) throws -> [Function] {
-        guard let syntaxTreeData = syntaxTreeJson.data(using: .utf8)
-            else { return [] }
-
-        let deserializer = SyntaxTreeDeserializer()
-        let syntax = try deserializer.deserialize(syntaxTreeData, serializationFormat: .json)
-        return parse(item: syntax, collecting: Function.self)
+    static func parse(file: Path, parseProtocols: Bool) throws -> [Function] {
+        let sourceFileSyntax = try SyntaxParser.parse(file.url)
+        let parser = self.init(file: file, sourceFileSyntax: sourceFileSyntax, parseProtocols: parseProtocols)
+        return parser.parse(item: sourceFileSyntax, collecting: Function.self)
     }
 
     // MARK: - Private
@@ -177,8 +164,10 @@ final class UnusedParamParser {
         case let item as InitializerDeclSyntax:
             parsed = parse(initializerDecl: item, collector)
         default:
-            if item.numberOfChildren > 0 {
-                let items = item.children.compactMap { parse(item: $0, collector) }
+            let childItems = item.children.map { $0 }
+
+            if childItems.count > 0 {
+                let items = childItems.compactMap { parse(item: $0, collector) }
                 let kind = String(describing: type(of: item))
                 parsed = GenericItem(kind: kind, items: items)
             } else {
@@ -211,7 +200,7 @@ final class UnusedParamParser {
         return Parameter(firstName: syntax.firstName?.text,
                          secondName: syntax.secondName?.text,
                          metatype: metatype,
-                         location: sourceLocation(of: syntax.position))
+                         location: sourceLocation(of: syntax))
     }
 
     private func parse<T>(closureExpr syntax: ClosureExprSyntax, _ collector: Collector<T>?) -> Closure? {
@@ -257,35 +246,32 @@ final class UnusedParamParser {
                      genericParams: syntax.genericParameterClause,
                      body: syntax.body,
                      named: syntax.identifier.text,
-                     position: syntax.identifier.position,
+                     location: sourceLocation(of: syntax.identifier),
                      collector)
     }
 
     private func parse<T>(initializerDecl syntax: InitializerDeclSyntax, _ collector: Collector<T>?) -> Item? {
         // syntax.initKeyword.position is incorrect, try to find the correct position.
-        var position = syntax.initKeyword.position
+        var offset: Int?
 
         if let leftBracket = syntax.genericParameterClause?.leftAngleBracket {
-            // leftBracket offset is incorrect by +1
-            position = AbsolutePosition(line: leftBracket.position.line,
-                                        column: leftBracket.position.column - 4,
-                                        utf8Offset: leftBracket.position.utf8Offset - 5)
+            offset = leftBracket.position.utf8Offset - 5
         } else {
             let leftParen = syntax.parameters.leftParen
-            position = AbsolutePosition(line: leftParen.position.line,
-                                        column: leftParen.position.column - 4,
-                                        utf8Offset: leftParen.position.utf8Offset - 4)
+            offset = leftParen.position.utf8Offset - 4
         }
+
+        let location = sourceLocation(of: syntax, offset: offset)
 
         return build(function: syntax.parameters,
                      genericParams: syntax.genericParameterClause,
                      body: syntax.body,
                      named: "init",
-                     position: position,
+                     location: location,
                      collector)
     }
 
-    private func build<T>(function syntax: Syntax, genericParams: GenericParameterClauseSyntax?, body: Syntax?, named name: String, position: AbsolutePosition, _ collector: Collector<T>?) -> Function? {
+    private func build<T>(function syntax: Syntax, genericParams: GenericParameterClauseSyntax?, body: Syntax?, named name: String, location: SourceLocation, _ collector: Collector<T>?) -> Function? {
         if body == nil && !parseProtocols {
             // Function has no body, must be a protocol declaration.
             return nil
@@ -303,7 +289,7 @@ final class UnusedParamParser {
         let function = Function(
             name: name,
             fullName: fullName,
-            location: sourceLocation(of: position),
+            location: location,
             items: items,
             parameters: params,
             genericParameters: genericParamNames)
@@ -329,11 +315,13 @@ final class UnusedParamParser {
         return "\(function)(\(strParams):)"
     }
 
-    private func sourceLocation(of position: AbsolutePosition) -> SourceLocation {
+    private func sourceLocation(of syntax: Syntax, offset: Int? = nil) -> SourceLocation {
+        let location = syntax.startLocation(converter: .init(file: file.string, tree: sourceFileSyntax))
+
         return SourceLocation(file: SourceFile(path: file),
-                              line: Int64(position.line),
-                              column: Int64(position.column),
-                              offset: Int64(position.utf8Offset))
+                              line: location.line,
+                              column: location.column,
+                              offset: offset ?? syntax.position.utf8Offset)
     }
 }
 

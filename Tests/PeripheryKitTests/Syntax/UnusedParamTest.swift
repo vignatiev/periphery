@@ -129,10 +129,7 @@ class UnusedParamTest: XCTestCase {
         XCTAssertEqual(init2.location.offset!, 110)
     }
 
-    // MARK: - Known Failures
-
-    func knownfailure_testMultiLineParameterPosition() {
-        // https://bugs.swift.org/browse/SR-9306
+    func testMultiLineParameterPosition() {
         analyze()
         let function = functions.first!
         let param1 = function.parameters.first { $0.name == "param1" }!
@@ -147,8 +144,7 @@ class UnusedParamTest: XCTestCase {
     private var functions: [Function] = []
 
     private func analyze() {
-        let parser = UnusedParamParser(file: fixturePath, parseProtocols: false)
-        functions = try! parser.parse()
+        functions = try! UnusedParamParser.parse(file: fixturePath, parseProtocols: false)
         let analyzer = UnusedParameterAnalyzer()
 
         for function in functions {

@@ -43,7 +43,7 @@ final class ProtocolConformanceReferenceBuilder: SourceGraphVisitor {
                     // Find all superclasses.
                     let superclassDecls = graph.superclassReferences(of: conformingClass)
                         .filter { $0.kind == .class }
-                        .compactMap { graph.declaration(withUsr: $0.usr) }
+                        .flatMap { graph.declarations(withUsr: $0.usr) }
                         .flatMap { $0.declarations }
 
                     for unimplementedProtoDecl in unimplementedProtoDecls {
@@ -60,9 +60,9 @@ final class ProtocolConformanceReferenceBuilder: SourceGraphVisitor {
 
                             let reference = Reference(kind: referenceKind,
                                                       usr: declInSuperclass.usr,
-                                                      location: declInSuperclass.location)
+                                                      location: declInSuperclass.location,
+                                                      isRelated: true)
                             reference.name = declInSuperclass.name
-                            reference.isRelated = true
                             reference.parent = unimplementedProtoDecl
                             graph.add(reference, from: unimplementedProtoDecl)
                             newReferences.insert(reference)
@@ -93,7 +93,7 @@ final class ProtocolConformanceReferenceBuilder: SourceGraphVisitor {
                 // that '<' is used when calling sort().
 
                 let inheritsForeignProtocol = graph.superclassReferences(of: conformingDeclaration).contains {
-                    graph.declaration(withUsr: $0.usr) == nil
+                    graph.declarations(withUsr: $0.usr).isEmpty
                 }
 
                 if !inheritsForeignProtocol {
@@ -138,7 +138,7 @@ final class ProtocolConformanceReferenceBuilder: SourceGraphVisitor {
             guard equivalentDeclarationKinds.contains(conformingDeclaration.kind),
                 conformingDeclaration.name == relatedReference.name else { continue }
 
-            if let protocolDeclaration = graph.declaration(withUsr: relatedReference.usr) {
+            if let protocolDeclaration = graph.declarations(withUsr: relatedReference.usr).first {
                 // Invert the related reference such that instead of the conforming declaration
                 // referencing the declaration within the protocol, the protocol declaration
                 // now references the conforming declaration.
@@ -151,10 +151,10 @@ final class ProtocolConformanceReferenceBuilder: SourceGraphVisitor {
 
                 let newReference = Reference(kind: relatedReference.kind,
                                              usr: conformingDeclaration.usr,
-                                             location: relatedReference.location)
+                                             location: relatedReference.location,
+                                             isRelated: true)
                 newReference.name = relatedReference.name
                 newReference.parent = protocolDeclaration
-                newReference.isRelated = true
                 graph.add(newReference, from: protocolDeclaration)
             } else {
                 // The referenced declaration is external, e.g from stdlib/Foundation.

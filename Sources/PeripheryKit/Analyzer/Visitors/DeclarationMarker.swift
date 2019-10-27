@@ -38,15 +38,11 @@ final class DeclarationMarker: SourceGraphVisitor {
     }
 
     private func declarationsReferenced(by reference: Reference) -> Set<Declaration> {
-        var declarations: Set<Declaration> = []
+        var declarations = graph.declarations(withUsr: reference.usr)
 
-        if let declaration = graph.declaration(withUsr: reference.usr) {
-            declarations.insert(declaration)
-        }
+        if let receiverUsr = reference.receiverUsr {
+            declarations.formUnion(graph.declarations(withUsr: receiverUsr))
 
-        if let receiverUsr = reference.receiverUsr,
-            let declaration = graph.declaration(withUsr: receiverUsr) {
-            declarations.insert(declaration)
         }
 
         return declarations

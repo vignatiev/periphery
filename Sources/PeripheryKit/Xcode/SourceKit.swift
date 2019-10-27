@@ -43,30 +43,6 @@ final class SourceKit {
         return response
     }
 
-    func editorOpenSyntaxTree(_ file: SourceFile) throws -> [String: Any] {
-        let request: SourceKitObject = [
-            "key.request": UID("source.request.editor.open"),
-            "key.name": NSUUID().uuidString,
-            "key.sourcefile": file.path.string,
-            "key.enablesyntaxmap": 0,
-            "key.enablesubstructure": 0,
-            "key.enablesyntaxtree": 1,
-            "key.syntactic_only": 1,
-            "key.syntaxtreetransfermode": UID("source.syntaxtree.transfer.full"),
-            "key.syntax_tree_serialization_format":
-                UID("source.syntaxtree.serialization.format.json")
-        ]
-        let response: [String: Any]
-
-        do {
-            response = try Request.customRequest(request: request).send()
-        } catch {
-            throw PeripheryKitError.sourceKitRequestFailed(type: "editorOpenSyntaxTree", file: file.path.string, error: error)
-        }
-
-        return response
-    }
-
     func editorOpenSubstructure(_ file: SourceFile) throws -> [String: Any] {
         let request: SourceKitObject = [
             "key.request": UID("source.request.editor.open"),
@@ -101,19 +77,6 @@ final class SourceKit {
             response = try Request.customRequest(request: request).send()
         } catch {
             throw PeripheryKitError.sourceKitRequestFailed(type: "cursorInfo", file: file.path.string, error: error)
-        }
-
-        return response
-    }
-
-    func syntaxTree(file: Path) throws -> [String: Any] {
-        let response: [String: Any]
-
-        do {
-            let skFile = SourceKittenFramework.File(pathDeferringReading: file.string)
-            response = try Request.syntaxTree(file: skFile, byteTree: false).send()
-        } catch {
-            throw PeripheryKitError.sourceKitRequestFailed(type: "syntaxTree", file: file.string, error: error)
         }
 
         return response

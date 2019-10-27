@@ -21,10 +21,6 @@ public struct ScanCommand: CommandProtocol {
             configuration.updateCheck = !options.disableUpdateCheck.value
         }
 
-        if options.diagnose.explicit {
-            configuration.diagnosisConsole = options.diagnose.value
-        }
-
         if options.retainPublic.explicit {
             configuration.retainPublic = options.retainPublic.value
         }
@@ -119,7 +115,6 @@ public struct ScanOptions: OptionsProtocol {
     let format: String?
     let indexExclude: [String]
     let reportExclude: [String]
-    let diagnose: BoolValue
     let verbose: BoolValue
     let quiet: BoolValue
     let disableUpdateCheck: BoolValue
@@ -127,8 +122,8 @@ public struct ScanOptions: OptionsProtocol {
     let useBuildLog: String?
     let strict: BoolValue
 
-    public static func create(_ config: String?) -> (_ workspace: String?) -> (_ project: String?) -> (_ schemes: String) -> (_ targets: String) -> (_ retainPublic: BoolValue) -> (_ retainObjcAnnotated: BoolValue) -> (_ retainUnusedProtocolFuncParams: BoolValue) -> (_ aggressive: BoolValue) -> (_ format: String?) -> (_ indexExclude: String?) -> (_ reportExclude: String?) -> (_ saveBuildLog: String?) -> (_ useBuildLog: String?) -> (_ diagnose: BoolValue) -> (_ verbose: BoolValue) -> (_ quiet: BoolValue) -> (_ disableUpdateCheck: BoolValue) -> (_ strict: BoolValue) -> ScanOptions {
-        return { workspace in { project in { schemes in { targets in { retainPublic in { retainObjcAnnotated in { retainUnusedProtocolFuncParams in { aggressive in { format in { indexExclude in { reportExclude in { saveBuildLog in { useBuildLog in { diagnose in { verbose in { quiet in { disableUpdateCheck in { strict in
+    public static func create(_ config: String?) -> (_ workspace: String?) -> (_ project: String?) -> (_ schemes: String) -> (_ targets: String) -> (_ retainPublic: BoolValue) -> (_ retainObjcAnnotated: BoolValue) -> (_ retainUnusedProtocolFuncParams: BoolValue) -> (_ aggressive: BoolValue) -> (_ format: String?) -> (_ indexExclude: String?) -> (_ reportExclude: String?) -> (_ saveBuildLog: String?) -> (_ useBuildLog: String?) -> (_ verbose: BoolValue) -> (_ quiet: BoolValue) -> (_ disableUpdateCheck: BoolValue) -> (_ strict: BoolValue) -> ScanOptions {
+        return { workspace in { project in { schemes in { targets in { retainPublic in { retainObjcAnnotated in { retainUnusedProtocolFuncParams in { aggressive in { format in { indexExclude in { reportExclude in { saveBuildLog in { useBuildLog in { verbose in { quiet in { disableUpdateCheck in { strict in
             return self.init(config: config,
                              workspace: workspace,
                              project: project,
@@ -141,14 +136,13 @@ public struct ScanOptions: OptionsProtocol {
                              format: format,
                              indexExclude: parse(indexExclude, "|"),
                              reportExclude: parse(reportExclude, "|"),
-                             diagnose: diagnose,
                              verbose: verbose,
                              quiet: quiet,
                              disableUpdateCheck: disableUpdateCheck,
                              saveBuildLog: saveBuildLog,
                              useBuildLog: useBuildLog,
                              strict: strict)
-            }}}}}}}}}}}}}}}}}}
+            }}}}}}}}}}}}}}}}}
     }
 
     public static func evaluate(_ mode: CommandMode) -> Result<ScanOptions, CommandantError<PeripheryKitError>> {
@@ -211,10 +205,6 @@ public struct ScanOptions: OptionsProtocol {
             <*> mode <| Option(key: "use-build-log",
                                defaultValue: nil,
                                usage: "Use the build log identified by the given key saved using '--save-build-log'. Or, use the build log at the given path (the log file must have a .log extension)")
-
-            <*> mode <| Option(key: "diagnose",
-                               defaultValue: BoolValue(config.diagnosisConsole),
-                               usage: "Start an interactive diagnosis console after analysis completes")
 
             <*> mode <| Option(key: "verbose",
                                defaultValue: BoolValue(config.verbose),

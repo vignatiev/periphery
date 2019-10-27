@@ -96,11 +96,6 @@ final class ScanBehavior {
             return .failure(.underlyingError(error))
         }
 
-        if configuration.diagnosisConsole, let graph = result.graph {
-            let console = DiagnosisConsole(graph: graph)
-            console.start()
-        }
-
         return .success(())
     }
 }

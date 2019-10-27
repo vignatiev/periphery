@@ -27,7 +27,6 @@ public final class Configuration: Singleton {
     var quiet: Bool = false
     var aggressive: Bool = false
     var updateCheck: Bool = true
-    var diagnosisConsole: Bool = false
     var strict: Bool = false
 
     // Non user facing.
@@ -54,7 +53,6 @@ public final class Configuration: Singleton {
             "quiet": quiet,
             "aggressive": aggressive,
             "disable_update_check": !updateCheck,
-            "diagnose": diagnosisConsole,
             "strict": strict
         ]
 
@@ -117,10 +115,6 @@ public final class Configuration: Singleton {
 
         if let value = yaml["aggressive"] as? Bool {
             self.aggressive = value
-        }
-
-        if let value = yaml["diagnose"] as? Bool {
-            self.diagnosisConsole = value
         }
 
         if let value = yaml["verbose"] as? Bool {

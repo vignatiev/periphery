@@ -9,14 +9,7 @@ final class UnusedParameterAnalyzer {
     }
 
     func analyze(file: Path, parseProtocols: Bool) throws -> Set<Parameter> {
-        let parser = UnusedParamParser(file: file, parseProtocols: parseProtocols)
-        let functions = try parser.parse()
-        return Set(functions.flatMap { analyze(function: $0) })
-    }
-
-    func analyze(file: Path, json: String, parseProtocols: Bool) throws -> Set<Parameter> {
-        let parser = UnusedParamParser(file: file, parseProtocols: parseProtocols)
-        let functions = try parser.parse(syntaxTreeJson: json)
+        let functions = try UnusedParamParser.parse(file: file, parseProtocols: parseProtocols)
         return Set(functions.flatMap { analyze(function: $0) })
     }
 

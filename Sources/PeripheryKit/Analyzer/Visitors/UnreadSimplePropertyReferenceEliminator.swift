@@ -26,15 +26,19 @@ final class UnreadSimplePropertyReferenceEliminator: SourceGraphVisitor {
 
             for reference in references {
                 // Parent should be a reference to a simple property.
-                guard let propertyReference = reference.parent as? Reference,
-                    let property = graph.declaration(withUsr: propertyReference.usr),
-                    !property.isComplexProperty else { continue }
+                guard let propertyReference = reference.parent as? Reference else { continue }
+
+                let properties = graph.declarations(withUsr: propertyReference.usr)
+
+                guard properties.allSatisfy({ !$0.isComplexProperty }) else { continue }
 
                 // If the property reference has no other descendent references we can remove it.
                 if propertyReference.references == [reference] {
                     graph.remove(propertyReference)
-                    property.analyzerHints.append(.unreadProperty)
-                    property.analyzerHints.append(.aggressive)
+                    properties.forEach {
+                        $0.analyzerHints.append(.unreadProperty)
+                        $0.analyzerHints.append(.aggressive)
+                    }
                 }
             }
         }

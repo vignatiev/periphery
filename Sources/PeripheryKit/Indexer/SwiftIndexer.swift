@@ -85,11 +85,8 @@ final class SwiftIndexer: TypeIndexer {
     }
 
     private func parseUnusedParams(_ sourceFile: SourceFile, _ sourceKit: SourceKit) throws {
-        let syntaxTree = try sourceKit.editorOpenSyntaxTree(sourceFile)
-        guard let syntaxTreeJson = syntaxTree[SourceKit.Key.serializedSyntaxTree.rawValue] as? String else { return }
-
         let analyzer = UnusedParameterAnalyzer()
-        let params = try analyzer.analyze(file: sourceFile.path, json: syntaxTreeJson, parseProtocols: true)
+        let params = try analyzer.analyze(file: sourceFile.path, parseProtocols: true)
 
         for param in params {
             guard let functionDecl = try functionDecl(for: param, sourceKit) else { continue }
@@ -97,7 +94,7 @@ final class SwiftIndexer: TypeIndexer {
             let paramDecl = param.declaration
             paramDecl.parent = functionDecl
             functionDecl.unusedParameters.insert(paramDecl)
-            graph.add(paramDecl)
+            _ = graph.add(paramDecl)
         }
     }
 
@@ -112,7 +109,7 @@ final class SwiftIndexer: TypeIndexer {
         }
 
         let info = try sourceKit.cursorInfo(file: function.location.file,
-                                            offset: offset)
+                                            offset: Int64(offset))
 
         guard let rawKind = info[SourceKit.Key.kind.rawValue] as? String,
             let usr = info[SourceKit.Key.usr.rawValue] as? String
@@ -128,7 +125,8 @@ final class SwiftIndexer: TypeIndexer {
                 return nil
         }
 
-        guard let functionDecl = graph.declaration(withUsr: usr) else {
+        // We can't handle multiple declarations here, so just assume there's only one (which there should only be).
+        guard let functionDecl = graph.declarations(withUsr: usr).first else {
             logger.warn("No such function declaration with USR '\(usr)'")
             return nil
         }
@@ -226,18 +224,32 @@ final class SwiftIndexer: TypeIndexer {
 
     private func build(kind: Declaration.Kind, entity: [String: Any], structures: [[String: Any]]?, file: SourceFile) throws -> (declaration: Declaration, substructures: [[String: Any]]) {
         guard let usr = entity[SourceKit.Key.usr.rawValue] as? String,
-            let line = entity[SourceKit.Key.line.rawValue] as? Int64,
-            let column = entity[SourceKit.Key.column.rawValue] as? Int64 else {
+            let rawLine = entity[SourceKit.Key.line.rawValue],
+            let rawColumn = entity[SourceKit.Key.column.rawValue] else {
                 throw PeripheryKitError.swiftIndexingError(message: "Failed to parse declaration entity: \(entity)")
         }
 
-        let location = SourceLocation(file: file, line: line, column: column)
-        let declaration = Declaration(kind: kind, usr: usr, location: location)
-        var substructures: [[String: Any]] = []
+        var line_: Int?
+        var column_: Int?
 
-        if let name = entity[SourceKit.Key.name.rawValue] as? String {
-            declaration.name = name
+        if let rawLine = rawLine as? Int64 {
+            line_ = Int(rawLine)
+        } else if let rawLine = rawLine as? Int {
+            line_ = rawLine
         }
+
+        if let rawColumn = rawColumn as? Int64 {
+            column_ = Int(rawColumn)
+        } else if let rawColumn = rawColumn as? Int {
+            column_ = rawColumn
+        }
+
+        guard let line = line_, let column = column_ else { throw PeripheryKitError.swiftIndexingError(message: "Failed to parse declaration entity: \(entity)") }
+
+        let location = SourceLocation(file: file, line: line, column: column)
+        let name = entity[SourceKit.Key.name.rawValue] as? String// ?? graph.existingName(forDuplicateDeclarationUSR: usr)
+        let declaration = Declaration(kind: kind, usr: usr, location: location, name: name)
+        var substructures: [[String: Any]] = []
 
         if let structures = structures, let name = declaration.name {
             let matchingStructures = structures.filter {
@@ -275,8 +287,8 @@ final class SwiftIndexer: TypeIndexer {
             throw PeripheryKitError.swiftIndexingError(message: "Failed to parse reference entity: \(entity)")
         }
 
-        var line = entity[SourceKit.Key.line.rawValue] as? Int64
-        var column = entity[SourceKit.Key.column.rawValue] as? Int64
+        var line = entity[SourceKit.Key.line.rawValue] as? Int
+        var column = entity[SourceKit.Key.column.rawValue] as? Int
 
         if let parent = parent {
             // Some related references do not have a line or column, therefore we use those from
@@ -291,17 +303,15 @@ final class SwiftIndexer: TypeIndexer {
         }
 
         let location = SourceLocation(file: file, line: line, column: column)
-        let reference = Reference(kind: kind, usr: usr, location: location)
-        reference.isRelated = isRelated
+        let name = entity[SourceKit.Key.name.rawValue] as? String
+        let receiverUsr = entity[SourceKit.Key.receiverUsr.rawValue] as? String
 
-        if let name = entity[SourceKit.Key.name.rawValue] as? String {
-            reference.name = name
-        }
-
-        if let receiverUsr = entity[SourceKit.Key.receiverUsr.rawValue] as? String {
-            reference.receiverUsr = receiverUsr
-        }
-
+        let reference = Reference(kind: kind,
+                                  usr: usr,
+                                  location: location,
+                                  isRelated: isRelated,
+                                  receiverUsr: receiverUsr)
+        reference.name = name
         graph.add(reference)
         return reference
     }

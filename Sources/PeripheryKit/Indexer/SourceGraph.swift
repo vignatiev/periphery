@@ -10,7 +10,7 @@ public final class SourceGraph {
 
     private var allReferencesByUsr: [String: Set<Reference>] = [:]
     private var allDeclarationsByKind: [Declaration.Kind: Set<Declaration>] = [:]
-    private var allDeclarationsByUsr: [String: Declaration] = [:]
+    private var allDeclarationsByUsr: [String: Set<Declaration>] = [:]
 
     private let mutationQueue: DispatchQueue
 
@@ -48,8 +48,8 @@ public final class SourceGraph {
         return allDeclarationsByKind[kind] ?? []
     }
 
-    func declaration(withUsr usr: String) -> Declaration? {
-        return allDeclarationsByUsr[usr]
+    func declarations(withUsr usr: String) -> Set<Declaration> {
+        return allDeclarationsByUsr[usr] ?? []
     }
 
     func references(toUsr usr: String) -> Set<Reference> {
@@ -69,7 +69,20 @@ public final class SourceGraph {
             }
 
             allDeclarationsByKind[declaration.kind]?.insert(declaration)
-            allDeclarationsByUsr[declaration.usr] = declaration
+
+            if !allDeclarationsByUsr.keys.contains(declaration.usr) {
+                allDeclarationsByUsr[declaration.usr] = []
+            }
+
+            allDeclarationsByUsr[declaration.usr]?.insert(declaration)
+        }
+    }
+
+    func existingName(forDuplicateDeclarationUSR usr: String) -> String? {
+        return mutationQueue.sync {
+            // Duplicate declarations shouldn't even be a thing, but they are. To make things worse, sometimes the
+            // duplicated declarations don't have a name.
+            allDeclarationsByUsr[usr]?.mapFirst { $0.name }
         }
     }
 
@@ -164,8 +177,8 @@ public final class SourceGraph {
         for reference in decl.immediateSuperclassReferences {
             references.append(reference)
 
-            if let superclassDecl = declaration(withUsr: reference.usr) {
-                references = superclassReferences(of: superclassDecl) + references
+            declarations(withUsr: reference.usr).forEach {
+                references.append(contentsOf: superclassReferences(of: $0))
             }
         }
 
@@ -173,8 +186,8 @@ public final class SourceGraph {
     }
 
     func superclasses(of decl: Declaration) -> [Declaration] {
-        return superclassReferences(of: decl).compactMap {
-            declaration(withUsr: $0.usr)
+        return superclassReferences(of: decl).flatMap {
+            declarations(withUsr: $0.usr)
         }
     }
 
@@ -207,10 +220,8 @@ public final class SourceGraph {
 
         guard let extendedReference = extensionDeclaration.references.first(where: { $0.kind == extendedKind && $0.name == extensionDeclaration.name }) else { return nil }
 
-        if let extendedDeclaration = allDeclarationsByUsr[extendedReference.usr] {
-            return extendedDeclaration
-        }
-
-        return nil
+        // We're just going to assume there's only a single extended decl, otherwise our situation becomes untenable.
+        // In practice I've never seen duplicate declarations for this, so hopefully we're OK.
+        return allDeclarationsByUsr[extendedReference.usr]?.first
     }
 }

@@ -168,6 +168,7 @@ public final class Declaration: Entity, CustomStringConvertible {
     public let location: SourceLocation
     let kind: Kind
     let usr: String
+    let name: String?
 
     var parent: Entity?
     var attributes: Set<String> = []
@@ -175,7 +176,6 @@ public final class Declaration: Entity, CustomStringConvertible {
     var unusedParameters: Set<Declaration> = []
     var references: Set<Reference> = []
     var related: Set<Reference> = []
-    var name: String?
     var structureAccessibility: Accessibility = .internal
     var analyzerHints: [Analyzer.Hint] = []
 
@@ -260,10 +260,11 @@ public final class Declaration: Entity, CustomStringConvertible {
         return [kind.shortName, formattedName, accessibility.shortName, formattedAttributes, "'\(usr)'", location.shortDescription]
     }
 
-    init(kind: Kind, usr: String, location: SourceLocation) {
+    init(kind: Kind, usr: String, location: SourceLocation, name: String?) {
         self.kind = kind
         self.usr = usr
         self.location = location
+        self.name = name
     }
 
     func isDeclaredInExtension(kind: Declaration.Kind) -> Bool {
@@ -286,6 +287,8 @@ extension Declaration: Hashable {
     public func hash(into hasher: inout Hasher) {
         hasher.combine(kind)
         hasher.combine(usr)
+        hasher.combine(name)
+        hasher.combine(location)
     }
 }
 
@@ -293,7 +296,9 @@ extension Declaration: Equatable {
     public static func == (lhs: Declaration, rhs: Declaration) -> Bool {
         let usrIsEqual = lhs.usr == rhs.usr
         let kindIsEqual = lhs.kind == rhs.kind
+        let nameIsEqual = lhs.name == rhs.name
+        let locationIsEqual = lhs.location == rhs.location
 
-        return kindIsEqual && usrIsEqual
+        return kindIsEqual && usrIsEqual && nameIsEqual && locationIsEqual
     }
 }

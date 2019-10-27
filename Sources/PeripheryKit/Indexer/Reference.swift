@@ -59,19 +59,33 @@ final class Reference: Entity {
     let location: SourceLocation
     let kind: Kind
     let usr: String
+    let isRelated: Bool
 
     var parent: Entity?
     var declarations: Set<Declaration> = []
     var references: Set<Reference> = []
-    var receiverUsr: String?
     var name: String?
-    var isRelated: Bool = false
 
-    init(kind: Kind, usr: String, location: SourceLocation) {
+    private let receiverUsrInternal: String?
+
+    init(kind: Kind, usr: String, location: SourceLocation, isRelated: Bool = false, receiverUsr: String? = nil) {
         self.kind = kind
         self.usr = usr
         self.location = location
+        self.isRelated = isRelated
+        self.receiverUsrInternal = receiverUsr
     }
+
+    var receiverUsr: String? {
+        // receiverUsr cannot be mutated as it's used in the hash function.
+        if receiverUsrIsActive {
+            return receiverUsrInternal
+        }
+
+        return nil
+    }
+
+    var receiverUsrIsActive: Bool = true
 
     var descendentReferences: Set<Reference> {
         return Set(references.flatMap { $0.descendentReferences }).union(references)
@@ -94,10 +108,7 @@ extension Reference: Hashable {
         hasher.combine(usr)
         hasher.combine(location)
         hasher.combine(isRelated)
-
-        if let receiverUsr = receiverUsr {
-            hasher.combine(receiverUsr)
-        }
+        hasher.combine(receiverUsrInternal)
     }
 }
 
@@ -107,12 +118,7 @@ extension Reference: Equatable {
         let locationIsEqual = lhs.location == rhs.location
         let kindIsEqual = lhs.kind == rhs.kind
         let relatedIsEqual = lhs.isRelated == rhs.isRelated
-        var receiverUsrIsEqual = true
-
-        if let lhsReceiverUsr = lhs.receiverUsr,
-            let rhsReceiverUsr = rhs.receiverUsr {
-            receiverUsrIsEqual = lhsReceiverUsr == rhsReceiverUsr
-        }
+        let receiverUsrIsEqual = lhs.receiverUsrInternal == rhs.receiverUsrInternal
 
         return usrIsEqual && receiverUsrIsEqual && locationIsEqual && kindIsEqual && relatedIsEqual
     }

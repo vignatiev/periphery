@@ -26,13 +26,7 @@ public final class Xcodebuild: Injectable {
     }
 
     func clearDerivedData(for project: XcodeProjectlike) throws {
-        let old = try oldDerivedDataPath()
-
-        if old.exists {
-            try exec(["rm", "-rf", old.string])
-        }
-
-        try exec(["rm", "-rf", try derivedDataPath(for: project).string])
+        try exec(["rm", "-rf", derivedDataPath(for: project).string])
     }
 
     @discardableResult
@@ -43,7 +37,7 @@ public final class Xcodebuild: Injectable {
             "-\(project.type)", project.path.absolute().string,
             "-scheme", scheme,
             "-parallelizeTargets",
-            "-derivedDataPath", try derivedDataPath(for: project).string
+            "-derivedDataPath", derivedDataPath(for: project).string
         ]
 
         let envs = [
@@ -121,13 +115,9 @@ public final class Xcodebuild: Injectable {
 
     // MARK: - Private
 
-    private func derivedDataPath(for project: XcodeProjectlike) throws -> Path {
-        let normalizedName = project.name.sha1()
-        return try (PeripheryCachePath() + "DerivedData-\(normalizedName)")
-    }
-
-    private func oldDerivedDataPath() throws -> Path {
-        return try (PeripheryCachePath() + "DerivedData")
+    private func derivedDataPath(for project: XcodeProjectlike) -> Path {
+        let path = Path("~/Library/Developer/Xcode/DerivedData/\(PeripheryIdentifier)").normalize()
+        return (path + project.name.sha1())
     }
 
     @discardableResult

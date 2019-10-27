@@ -15,15 +15,16 @@ final class AssociatedTypeTypeAliasReferenceBuilder: SourceGraphVisitor {
         for alias in graph.declarations(ofKind: .typealias) {
             let related = alias.related.first { $0.kind == .associatedtype }
 
-            if let related = related,
-                let associated = graph.declaration(withUsr: related.usr) {
+            if let related = related {
+                let associated = graph.declarations(withUsr: related.usr)
                 graph.remove(related)
 
-                let inverseRelated = Reference(kind: .typealias, usr: alias.usr, location: alias.location)
-                inverseRelated.isRelated = true
-                inverseRelated.parent = associated
-                inverseRelated.name = alias.name
-                graph.add(inverseRelated, from: associated)
+                for decl in associated {
+                    let inverseRelated = Reference(kind: .typealias, usr: alias.usr, location: alias.location, isRelated: true)
+                    inverseRelated.parent = decl
+                    inverseRelated.name = alias.name
+                    graph.add(inverseRelated, from: decl)
+                }
             }
         }
     }

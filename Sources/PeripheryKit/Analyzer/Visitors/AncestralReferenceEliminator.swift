@@ -47,7 +47,7 @@ final class AncestralReferenceEliminator: SourceGraphVisitor {
             if anyDeclarations(in: stack, areReferencedBy: reference) {
                 graph.remove(reference)
             } else if anyDeclarations(in: stack, areReceiverReferencedBy: reference) {
-                reference.receiverUsr = nil
+                reference.receiverUsrIsActive = false
             }
 
             eliminateAncestralReferences(in: reference.references, stack: stack)
