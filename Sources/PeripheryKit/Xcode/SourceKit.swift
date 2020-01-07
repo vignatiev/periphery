@@ -28,7 +28,7 @@ final class SourceKit {
     private let arguments: [String]
 
     required init(arguments: [String]) {
-        self.arguments = arguments
+      self.arguments = arguments.map { $0.replacingOccurences(of: "\\ ", with: " ") }
     }
 
     func requestIndex(_ file: SourceFile) throws -> [String: Any] {
